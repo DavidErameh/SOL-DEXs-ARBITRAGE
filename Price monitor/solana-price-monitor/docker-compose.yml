@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  price-monitor:
+    build: .
+    image: solana-price-monitor:latest
+    container_name: price-monitor
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    environment:
+      - RUST_LOG=info
+      - HELIUS_API_KEY=${HELIUS_API_KEY}
+      - METRICS_ENABLED=true
+    volumes:
+      - ./logs:/app/logs

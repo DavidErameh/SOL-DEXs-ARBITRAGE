@@ -1,0 +1,41 @@
+{
+  "family": "solana-price-monitor",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "price-monitor",
+      "image": "ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/solana-price-monitor:latest",
+      "essential": true,
+      "environment": [
+        { "name": "RUST_LOG", "value": "info" },
+        { "name": "METRICS_ENABLED", "value": "true" }
+      ],
+      "secrets": [
+        {
+          "name": "HELIUS_API_KEY",
+          "valueFrom": "arn:aws:ssm:us-east-1:ACCOUNT_ID:parameter/solana/helius_api_key"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/solana-price-monitor",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "portMappings": [
+        {
+          "containerPort": 9090,
+          "hostPort": 9090,
+          "protocol": "tcp"
+        }
+      ]
+    }
+  ]
+}
