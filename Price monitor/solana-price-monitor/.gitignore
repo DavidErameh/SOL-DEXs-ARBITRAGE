@@ -1,0 +1,25 @@
+# Build artifacts
+/target/
+**/*.rs.bk
+
+# Environment files (contain secrets)
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Benchmark data
+*.profdata

@@ -1,0 +1,48 @@
+# ============================================
+# Solana Price Monitor Configuration
+# ============================================
+
+[rpc]
+# Helius RPC endpoints (loaded from environment)
+websocket_url = "${HELIUS_WS_URL}"
+http_url = "${HELIUS_HTTP_URL}"
+
+[monitoring]
+# Maximum number of pools to monitor simultaneously
+max_pools = 50
+# Time-to-live for cache entries in seconds
+cache_ttl_seconds = 60
+# Cleanup interval for stale entries
+cleanup_interval_seconds = 10
+# Price staleness threshold in milliseconds
+stale_threshold_ms = 2000
+
+[arbitrage]
+# Minimum net profit percentage to flag opportunity
+min_profit_percent = 0.5
+# Maximum trade size as percentage of pool liquidity
+max_trade_size_percent = 5.0
+# Maximum slot difference for price comparison
+slot_tolerance = 2
+
+[fees]
+# Default DEX fee percentage
+default_dex_fee = 0.25
+# Estimated slippage percentage
+estimated_slippage = 0.3
+# Gas cost as percentage of trade
+gas_cost_percent = 0.01
+# Jito tip as percentage of trade
+jito_tip_percent = 0.05
+
+# ============================================
+# Pool Addresses by Token Pair
+# ============================================
+
+[pools.sol_usdc]
+raydium = "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2"
+orca = "HJPjoWUrhoZzkNfRpHuieeFk9WcZWjwy6PBjZ81ngndJ"
+meteora = "7YttLkHDoNj9wyDur5pM1ejNaAvT9X4eqaYcHQqtj2G5"
+
+[pools.sol_usdt]
+raydium = "7XawhbbxtsRcQA8KTkHT9f9nc6d69UwqCDh6U5EEbEmX"
