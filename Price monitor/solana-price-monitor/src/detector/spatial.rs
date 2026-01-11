@@ -64,7 +64,7 @@ pub async fn detect_spatial_arbitrage(
     fees: &FeesConfig,
     slot_tolerance: u64,
 ) -> Option<Opportunity> {
-    let prices = cache.get_all_dexes(pair).await;
+    let prices = cache.get_all_dexes(pair); // DashMap is lock-free, no await
 
     if prices.len() < 2 {
         // debug!(pair = pair, count = prices.len(), "Not enough DEXs for comparison");

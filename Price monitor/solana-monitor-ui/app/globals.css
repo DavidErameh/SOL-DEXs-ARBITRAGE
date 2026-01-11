@@ -1,0 +1,114 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-void: #000500;
+    --text-primary: #00ff41;
+  }
+  
+  body {
+    background-color: var(--bg-void);
+    color: var(--text-primary);
+    cursor: text; /* Force text cursor for terminal feel */
+  }
+}
+
+@layer utilities {
+  .text-glow {
+    text-shadow: 0 0 2px #003800, 0 0 5px #00ff41;
+  }
+  
+  .text-glow-strong {
+    text-shadow: 0 0 5px #00ff41, 0 0 10px #00ff41;
+  }
+
+  .bg-scanlines {
+    background: linear-gradient(
+      to bottom,
+      rgba(18, 16, 16, 0) 50%,
+      rgba(0, 0, 0, 0.25) 50%
+    );
+    background-size: 100% 4px;
+  }
+  
+  .crs-block {
+    cursor: text;
+  }
+}
+
+/* Custom Phosphor Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #001100;
+  border-left: 1px solid #003300;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #003300;
+  border: 1px solid #00ff41;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00ff41;
+}
+
+/* Remove default scrollbar for hidden utility if needed */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@layer utilities {
+  .font-pixel {
+    font-family: var(--font-vt323), monospace;
+  }
+  .font-header {
+    font-family: var(--font-vt323), monospace;
+  }
+  .font-mono {
+    font-family: var(--font-share-tech), var(--font-jetbrains-mono), monospace;
+  }
+  
+  /* Manual Layout Fix */
+  .layout-spawn {
+    padding: 24px !important;
+    gap: 24px !important;
+    max-width: 1920px;
+    margin: 0 auto;
+  }
+
+  .header-status-bar {
+    gap: 32px !important;
+  }
+
+  .metric-item {
+    gap: 12px !important;
+    margin-right: 8px;
+  }
+
+  .panel-header-padding {
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+  }
+
+  .row-padding {
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+  }
+
+  .terminal-header-right {
+    min-width: 140px !important;
+    justify-content: flex-end !important;
+    padding-right: 8px !important;
+  }
+}

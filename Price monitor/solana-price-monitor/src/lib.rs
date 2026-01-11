@@ -15,5 +15,6 @@ pub mod websocket;
 // Re-export commonly used types
 pub use cache::PriceCache;
 pub use config::Settings;
-pub use detector::OpportunityDetector;
+pub use detector::{OpportunityDetector, StatisticalArbitrageDetector, TriangularArbitrageDetector};
 pub use models::{Opportunity, OpportunityType, PriceData};
+

@@ -2,13 +2,12 @@
 
 use anyhow::{Result, Context};
 use futures::{SinkExt, StreamExt};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::json;
 use std::collections::HashSet;
 use std::time::Duration;
-use tokio::net::TcpStream;
 use tokio::sync::mpsc;
-use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{info, warn, error, debug};
 use url::Url;

@@ -16,13 +16,13 @@ This document defines the architecture for a high-performance, real-time price m
 
 ### 1.2 Key Architectural Decisions
 
-| Decision           | Choice             | Rationale                                                       |
-| ------------------ | ------------------ | --------------------------------------------------------------- |
-| **Language**       | Rust               | Zero-cost abstractions, native Solana SDK, fearless concurrency |
-| **Async Runtime**  | Tokio              | Industry standard, handles 15,000+ tasks/second                 |
-| **Data Ingestion** | Helius Geyser gRPC | 50-200ms latency vs 500-2000ms polling                          |
-| **Cache**          | In-memory HashMap  | O(1) lookups, <5ms access time                                  |
-| **Serialization**  | Borsh              | Solana-native, deterministic binary format                      |
+| Decision           | Choice              | Rationale                                                       |
+| ------------------ | ------------------- | --------------------------------------------------------------- |
+| **Language**       | Rust                | Zero-cost abstractions, native Solana SDK, fearless concurrency |
+| **Async Runtime**  | Tokio               | Industry standard, handles 15,000+ tasks/second                 |
+| **Data Ingestion** | Helius Geyser gRPC  | 50-200ms latency vs 500-2000ms polling                          |
+| **Cache**          | DashMap (Lock-Free) | O(1) lookups, non-blocking concurrent access                    |
+| **Serialization**  | Borsh               | Solana-native, deterministic binary format                      |
 
 ### 1.3 Performance Targets
 
@@ -225,9 +225,8 @@ pub struct WhirlpoolState {
 **Data Structure**:
 
 ```rust
-use std::collections::HashMap;
+use dashmap::DashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use chrono::{DateTime, Utc};
 
 #[derive(Clone, Debug)]
@@ -236,27 +235,27 @@ pub struct PriceData {
     pub liquidity: u64,                  // Pool liquidity in USD
     pub slot: u64,                       // Solana slot number
     pub timestamp: DateTime<Utc>,        // Update time
-    pub vault_a_balance: u64,            // For slippage calc
-    pub vault_b_balance: u64,
+    pub specific_data: SpecificPoolData, // AMM/CLMM/DLMM specific fields
     pub fee_rate: f64,                   // DEX fee (e.g., 0.003)
 }
 
 pub struct PriceCache {
     // Map<TokenPair, Map<DEX, PriceData>>
-    data: Arc<RwLock<HashMap<String, HashMap<String, PriceData>>>>,
-    ttl: Duration,
+    // DashMap handles sharded locking internally for high concurrency
+    data: Arc<DashMap<String, DashMap<String, PriceData>>>,
+    ttl_ms: u64,
 }
 
 impl PriceCache {
-    pub async fn get(&self, pair: &str, dex: &str) -> Option<PriceData> {
-        let cache = self.data.read().await;
-        cache.get(pair)?.get(dex).cloned()
+    // Sync method (no await needed for lock-free read)
+    pub fn get(&self, pair: &str, dex: &str) -> Option<PriceData> {
+        self.data.get(pair)?.get(dex).map(|v| v.clone())
     }
 
-    pub async fn get_all_dexes(&self, pair: &str) -> Vec<(String, PriceData)> {
-        let cache = self.data.read().await;
-        cache.get(pair)
-            .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+    pub fn get_all_dexes(&self, pair: &str) -> Vec<(String, PriceData)> {
+        self.data
+            .get(pair)
+            .map(|m| m.iter().map(|kv| (kv.key().clone(), kv.value().clone())).collect())
             .unwrap_or_default()
     }
 
@@ -314,10 +313,23 @@ pub fn calculate_output_amount(
 **CLMM Price Calculation** (Orca Whirlpools):
 
 ```rust
-pub fn calculate_clmm_price(sqrt_price_x64: u128) -> f64 {
+pub fn calculate_clmm_price(sqrt_price_x64: u128, decimals_a: u8, decimals_b: u8) -> f64 {
     // sqrt_price is in Q64.64 fixed-point format
     let sqrt_price = sqrt_price_x64 as f64 / (1u128 << 64) as f64;
-    sqrt_price * sqrt_price  // price = (sqrt_price)^2
+    let price_raw = sqrt_price * sqrt_price;
+
+    // Adjust for decimals: price * 10^(dec_a - dec_b)
+    let adjustment = 10f64.powi(decimals_a as i32 - decimals_b as i32);
+    price_raw * adjustment
+}
+
+pub fn calculate_dlmm_price(active_id: i32, bin_step: u16, decimals_a: u8, decimals_b: u8) -> f64 {
+    // Price = (1 + bin_step/10000)^active_id
+    let base = 1.0 + (bin_step as f64 / 10000.0);
+    let price_raw = base.powi(active_id);
+
+    let adjustment = 10f64.powi(decimals_a as i32 - decimals_b as i32);
+    price_raw * adjustment
 }
 
 pub fn estimate_clmm_slippage(
@@ -519,7 +531,7 @@ sequenceDiagram
 | Geyser → WebSocket | 10-50ms      | Network transmission               |
 | Decode Account     | 5-15ms       | Borsh deserialization              |
 | Calculate Price    | 5-15ms       | AMM/CLMM math                      |
-| Update Cache       | 1-5ms        | HashMap write with RwLock          |
+| Update Cache       | 1-3ms        | DashMap (lock-free write)          |
 | Detect Opportunity | 10-50ms      | Multi-strategy scan                |
 | **Total**          | **81-235ms** | Well under 400ms target            |
 
@@ -529,8 +541,7 @@ sequenceDiagram
 
 ### 5.1 Helius Geyser gRPC Integration (2026)
 
-> [!TIP]
-> **2026 Recommendation**: Use Helius LaserStream or Geyser gRPC instead of standard WebSockets for production. LaserStream offers automatic failover and historical replay.
+> [!TIP] > **2026 Recommendation**: Use Helius LaserStream or Geyser gRPC instead of standard WebSockets for production. LaserStream offers automatic failover and historical replay.
 
 **Connection Options Comparison**:
 
@@ -593,8 +604,7 @@ pub async fn subscribe_to_pools(
 
 ### 5.3 Future Jito Integration Points
 
-> [!NOTE]
-> **Jito BAM (2026)**: The Block Assembly Marketplace is launching in 2026, offering TEE-based transaction ordering for MEV protection. This system prepares integration hooks.
+> [!NOTE] > **Jito BAM (2026)**: The Block Assembly Marketplace is launching in 2026, offering TEE-based transaction ordering for MEV protection. This system prepares integration hooks.
 
 **Prepared Interface for Execution Module**:
 

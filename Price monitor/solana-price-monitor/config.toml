@@ -1,21 +1,23 @@
 # ============================================
 # Solana Price Monitor Configuration
+# Zero-Cost Edition (Alchemy / Oracle Cloud)
 # ============================================
 
 [rpc]
-# Helius RPC endpoints (loaded from environment)
-websocket_url = "${HELIUS_WS_URL}"
-http_url = "${HELIUS_HTTP_URL}"
+# RPC endpoints (loaded from environment)
+# Supports both Alchemy and Helius via .env toggle
+websocket_url = "${RPC_WS_URL}"
+http_url = "${RPC_HTTP_URL}"
+max_retries = 10
+reconnect_delay_ms = 1000
 
 [monitoring]
-# Maximum number of pools to monitor simultaneously
-max_pools = 50
-# Time-to-live for cache entries in seconds
+# Optimized for 300M CU/month budget
+max_pools = 21  # 7 pairs × 3 DEXs
 cache_ttl_seconds = 60
-# Cleanup interval for stale entries
 cleanup_interval_seconds = 10
-# Price staleness threshold in milliseconds
 stale_threshold_ms = 2000
+heartbeat_interval_seconds = 30
 
 [arbitrage]
 # Minimum net profit percentage to flag opportunity
@@ -36,7 +38,8 @@ gas_cost_percent = 0.01
 jito_tip_percent = 0.05
 
 # ============================================
-# Pool Addresses by Token Pair
+# TIER 1: High-Volume Token Pairs
+# 7 pairs × 3 DEXs = 21 pools
 # ============================================
 
 [pools.sol_usdc]
@@ -46,3 +49,30 @@ meteora = "7YttLkHDoNj9wyDur5pM1ejNaAvT9X4eqaYcHQqtj2G5"
 
 [pools.sol_usdt]
 raydium = "7XawhbbxtsRcQA8KTkHT9f9nc6d69UwqCDh6U5EEbEmX"
+orca = "Dqk7mHQBx2ZWExmyAtQ6oLKCdBWGhp8Kx4ovhYBLY4Mb"
+meteora = "FMy8FKMtKdLBxn7UFdUjwqLkH8SQfChNGWJKW1N3p1z4"
+
+[pools.bonk_sol]
+raydium = "6uo5nWJnhAkCPHgWs94cjPVe8C3w5WkJGqVRkxKoWYRp"
+orca = "9vqYJjDUFecNTGFGxx7UQYqDVnVU8DaJg9VgXP8ACNv7"
+meteora = "HCttg8xpz5jgVKqjX9pQqqjmYpqb3pVpDpKoxsaNXWLZ"
+
+[pools.jto_sol]
+raydium = "D7p7PebNjpkH6VNHJhmiDFNmpz9XE5f8czvKvxWC9gxG"
+orca = "FZaKYR2fCPZN8b3xvqMfxdq1WqMpGfkG4PmRMcLhSxLr"
+meteora = "3wvtCHW2GpFWKKj3QdCfEjdFnrRZmxXbqUxmvN1MQcmP"
+
+[pools.jup_sol]
+raydium = "3DzZkf8w1wPgmqJ6fF5HTwKMU2TAwFw29FJJmzWbXNr3"
+orca = "7gZNLDbWE73ueAyhPWnexfCnWXBRTvNcYWGLbZww7Lzf"
+meteora = "2qDCKBL1BHqFxpMzPe6YMia6AuY3LXFYvfGLLgtLxHU3"
+
+[pools.w_sol]
+raydium = "HJPjoWUrhoZzkNfRpHuieeFk9WcZWjwy6PBjZ81ngndJ"
+orca = "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"
+meteora = "5dGiQqRDH1jrbCNRPtwLGNT8DVQ1K6NP9XqBYdDLdM2H"
+
+[pools.msol_sol]
+raydium = "WGodwrqrP8bYHRWzPKtXfNNqX9pz1Wn12p2sLvDk9qT"
+orca = "5mH7E6PpyBZDYL6CmJjpygjNgJtfg3CiULd4AAdLJh32"
+meteora = "6FJon3QE27qgPVggJgbnQVkGT92EPCQRTxwpCMeZ8rDK"

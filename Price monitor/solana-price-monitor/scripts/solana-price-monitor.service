@@ -1,0 +1,17 @@
+[Unit]
+Description=Solana Price Monitor Service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/solana-price-monitor
+ExecStart=/home/ubuntu/solana-price-monitor/target/release/solana-price-monitor
+Restart=always
+RestartSec=3
+EnvironmentFile=/home/ubuntu/solana-price-monitor/.env
+# High limit for WebSocket connections
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

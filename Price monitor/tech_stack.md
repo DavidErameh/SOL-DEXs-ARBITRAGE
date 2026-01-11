@@ -1,4 +1,5 @@
 # Technology Stack & Justification
+
 ## Solana Price Monitoring System
 
 ---
@@ -16,23 +17,22 @@ This system is built with **Rust** for maximum performance, leveraging the Solan
 **Version**: Rust 1.75+ (stable)
 
 **Why Rust?**
+
 1. **Performance**: Zero-cost abstractions, no garbage collection
    - Critical for <400ms latency requirement
    - Memory-safe without runtime overhead
-   
 2. **Concurrency**: Fearless concurrency with tokio async runtime
    - Handle 1000+ WebSocket messages/second
    - Safe concurrent access to price cache
-   
 3. **Type Safety**: Compile-time error checking
    - Prevents runtime failures in production
    - Strong typing for financial calculations
-   
 4. **Solana Ecosystem**: Native Solana SDK support
    - Official `solana-client`, `solana-sdk` crates
    - Direct interaction with on-chain programs
 
 **Performance Benchmarks**:
+
 ```
 Rust vs Python (price calculation loop):
 - Rust: 0.05ms per iteration
@@ -52,12 +52,14 @@ Rust vs JavaScript (async handling):
 **Crate**: `tokio = { version = "1.35", features = ["full"] }`
 
 **Why Tokio?**
+
 - Industry-standard async runtime for Rust
 - Powers Discord, AWS SDK, and other high-performance systems
 - Excellent for concurrent I/O operations (WebSocket streams)
 - Built-in timers, channels, and synchronization primitives
 
 **Features Used**:
+
 ```rust
 // Multiple concurrent WebSocket connections
 tokio::spawn(async move {
@@ -78,12 +80,14 @@ tokio::sync::mpsc::channel(1000);
 **Crate**: `tokio-tungstenite = "0.21"`
 
 **Why?**
+
 - Native async/await support with tokio
 - Handles Helius Geyser WebSocket protocol
 - Automatic reconnection logic
 - Low memory footprint
 
 **Alternative Considered**:
+
 - `websocket`: Lacks async support
 - `ws-rs`: Deprecated
 
@@ -92,15 +96,18 @@ tokio::sync::mpsc::channel(1000);
 ### 2.4 Solana Integration
 
 #### Solana Client Library
+
 **Crate**: `solana-client = "1.17"`
 
 **Why?**
+
 - Official Solana Foundation library
 - RPC client for account queries
 - WebSocket subscription management
 - Commitment level handling
 
 **Key Modules**:
+
 ```rust
 use solana_client::{
     rpc_client::RpcClient,
@@ -110,9 +117,11 @@ use solana_client::{
 ```
 
 #### Solana SDK
+
 **Crate**: `solana-sdk = "1.17"`
 
 **Why?**
+
 - Account data structures
 - Public key types
 - Transaction building (future phases)
@@ -122,28 +131,33 @@ use solana_client::{
 
 ### 2.5 Data Structures: Standard Library + Specialized
 
-#### HashMap for Price Cache
-**Type**: `std::collections::HashMap`
+#### DashMap for Price Cache
+
+**Type**: `dashmap::DashMap`
 
 **Why?**
-- O(1) lookup time for price queries
-- Thread-safe with `Arc<RwLock<HashMap>>`
-- Perfect for key-value storage (TokenPair → DEX → Price)
+
+- **Lock-free reads**: Non-blocking access for high-concurrency readers
+- **Shard-based locking**: Only locks specific bucket for writes
+- **Performance**: ~15% faster under high contention than RwLock<HashMap>
 
 **Structure**:
+
 ```rust
-type PriceCache = Arc<RwLock<
-    HashMap<
-        String,                          // TokenPair (e.g., "SOL-USDC")
-        HashMap<String, PriceData>       // DEX → PriceData
+type PriceCache = Arc<
+    DashMap<
+        String,                  // TokenPair (e.g., "SOL-USDC")
+        DashMap<String, PriceData> // DEX → PriceData
     >
->>;
+>;
 ```
 
 #### VecDeque for Rolling Statistics
+
 **Type**: `std::collections::VecDeque`
 
 **Why?**
+
 - Efficient for rolling window calculations
 - O(1) push/pop from both ends
 - Used for Z-score history in statistical arbitrage
@@ -159,14 +173,17 @@ struct PairStatistics {
 ### 2.6 Serialization: Borsh + Serde
 
 #### Borsh (Binary Object Representation Serializer)
+
 **Crate**: `borsh = "0.10"`
 
 **Why?**
+
 - Solana's native serialization format
 - Decode on-chain account data
 - Deterministic, compact binary format
 
 **Usage**:
+
 ```rust
 #[derive(BorshDeserialize)]
 struct RaydiumPool {
@@ -179,9 +196,11 @@ let pool: RaydiumPool = BorshDeserialize::deserialize(&mut account_data)?;
 ```
 
 #### Serde JSON
+
 **Crate**: `serde = { version = "1.0", features = ["derive"] }`
 
 **Why?**
+
 - Configuration file parsing
 - Logging structured data
 - API responses (future)
@@ -191,16 +210,19 @@ let pool: RaydiumPool = BorshDeserialize::deserialize(&mut account_data)?;
 ### 2.7 Error Handling: anyhow + thiserror
 
 **Crates**:
+
 ```toml
 anyhow = "1.0"
 thiserror = "1.0"
 ```
 
 **Why?**
+
 - `thiserror`: Define custom error types with automatic trait implementations
 - `anyhow`: Convenient error propagation with context
 
 **Pattern**:
+
 ```rust
 use anyhow::{Result, Context};
 use thiserror::Error;
@@ -209,7 +231,7 @@ use thiserror::Error;
 pub enum MonitorError {
     #[error("WebSocket connection failed")]
     WebSocketError,
-    
+
     #[error("Stale price data: {0}ms old")]
     StalePriceError(u64),
 }
@@ -225,34 +247,38 @@ fn fetch_price() -> Result<PriceData> {
 ### 2.8 Logging: tracing + tracing-subscriber
 
 **Crates**:
+
 ```toml
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ```
 
 **Why?**
+
 - Structured logging with span tracking
 - Zero-cost abstractions when logging disabled
 - Context-aware debugging
 - Performance profiling
 
 **Usage**:
+
 ```rust
 use tracing::{info, warn, error, instrument};
 
 #[instrument]
 async fn detect_arbitrage() -> Result<Vec<Opportunity>> {
     info!("Starting arbitrage scan");
-    
+
     let opportunities = scan_all_pairs();
-    
+
     info!(count = opportunities.len(), "Opportunities detected");
-    
+
     Ok(opportunities)
 }
 ```
 
 **Output**:
+
 ```
 2026-01-09T12:34:56.789Z INFO detect_arbitrage: Starting arbitrage scan
 2026-01-09T12:34:56.834Z INFO detect_arbitrage: Opportunities detected count=3
@@ -265,11 +291,13 @@ async fn detect_arbitrage() -> Result<Vec<Opportunity>> {
 **Crate**: `config = "0.13"`
 
 **Why?**
+
 - Load from TOML files
 - Environment variable override
 - Type-safe configuration structs
 
 **Config File** (`config.toml`):
+
 ```toml
 [rpc]
 websocket_url = "wss://mainnet.helius-rpc.com/?api-key=YOUR_KEY"
@@ -291,6 +319,7 @@ meteora = "7YttLkHDoNj9wyDur5pM1ejNaAvT9X4eqaYcHQqtj2G5"
 ```
 
 **Loading**:
+
 ```rust
 use config::{Config, File};
 use serde::Deserialize;
@@ -315,12 +344,14 @@ let settings = Config::builder()
 **Crate**: `statrs = "0.16"`
 
 **Why?**
+
 - Statistical distributions and tests
 - Cointegration analysis helpers
 - Z-score calculations
 - Correlation computations
 
 **Usage**:
+
 ```rust
 use statrs::statistics::{Statistics, Mean, Variance};
 
@@ -338,11 +369,13 @@ fn calculate_z_score(spread: f64, history: &[f64]) -> f64 {
 **Crate**: `chrono = "0.4"`
 
 **Why?**
+
 - Timestamp handling
 - Duration calculations
 - Timezone support
 
 **Usage**:
+
 ```rust
 use chrono::{DateTime, Utc, Duration};
 
@@ -359,47 +392,48 @@ fn is_stale(&self) -> bool {
 
 ## 3. EXTERNAL SERVICES
 
-### 3.1 Helius RPC (Free Tier)
+### 3.1 RPC Providers
 
-**Service**: WebSocket + HTTP RPC Endpoint  
-**Cost**: $0/month (Free Tier: 100 requests/second)
+#### Primary: Alchemy (Zero-Cost Edition)
 
-**Why Helius?**
-- Geyser plugin support for account streaming
-- Enhanced APIs (getAsset, getAssetBatch)
-- High reliability (99.9% uptime)
-- No credit card required for free tier
+**Service**: Solana RPC  
+**Cost**: Free (moderate limits)
+**Why?**: Reliable free tier for mainnet.
 
-**Endpoints**:
-```
-WebSocket: wss://mainnet.helius-rpc.com/?api-key=YOUR_KEY
-HTTP RPC:  https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
-```
+### 3.2 Cloud Infrastructure (Zero-Cost)
 
-**Rate Limits (Free Tier)**:
-- 100 requests/second
-- WebSocket: 10 concurrent connections
-- Sufficient for monitoring 50+ pools
+**Provider**: Oracle Cloud Infrastructure (OCI)
+**Instance Type**: **Ampere A1 Flex** (ARM64)
 
-**Alternative Considered**:
-- QuickNode: Paid only ($49/month minimum)
-- Alchemy: No Solana support
-- Public RPC: Unreliable, rate-limited
+**Specs (Always Free)**:
+
+- **Processor**: 4 OCPUs (Ampere Altra ARM)
+- **RAM**: 24 GB (vs 1GB on AWS)
+- **Bandwidth**: 10 TB/month outbound
+- **Architecture**: aarch64 (Rust compiles natively)
+
+**Why OCI?**
+
+- Massive RAM headroom for in-memory caching
+- Native Rust compilation support (no cross-compilation needed)
+- Indefinite free tier (no 12-month expiry)
 
 ---
 
-### 3.2 Jupiter Aggregator API (Optional)
+### 3.3 Jupiter Aggregator API (Optional)
 
 **Service**: Price quotes and route discovery  
 **Cost**: Free  
 **Endpoint**: `https://quote-api.jup.ag/v6/quote`
 
 **Use Cases**:
+
 - Validate price calculations
 - Discover new pools
 - Cross-reference arbitrage opportunities
 
 **Not Used For**:
+
 - Primary price monitoring (too slow, 200-500ms latency)
 - Real-time arbitrage detection
 
@@ -410,12 +444,14 @@ HTTP RPC:  https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
 ### 4.1 Build System: Cargo
 
 **Why?**
+
 - Rust's official package manager
 - Dependency management
 - Build profiles (dev, release)
 - Workspace support
 
 **Profiles**:
+
 ```toml
 [profile.release]
 opt-level = 3
@@ -428,6 +464,7 @@ codegen-units = 1    # Better optimization
 ### 4.2 Testing: Built-in + Criterion
 
 **Crates**:
+
 ```toml
 [dev-dependencies]
 criterion = "0.5"
@@ -435,11 +472,13 @@ mockall = "0.12"
 ```
 
 **Why?**
+
 - `cargo test` for unit tests
 - `criterion` for benchmarking
 - `mockall` for mocking WebSocket/RPC calls
 
 **Example Benchmark**:
+
 ```rust
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
@@ -460,10 +499,12 @@ fn price_calculation_benchmark(c: &mut Criterion) {
 ### 4.3 Formatting & Linting
 
 **Tools**:
+
 - `rustfmt`: Code formatting
 - `clippy`: Linting and best practices
 
 **Commands**:
+
 ```bash
 cargo fmt --all
 cargo clippy -- -D warnings
@@ -474,11 +515,13 @@ cargo clippy -- -D warnings
 ### 4.4 Documentation: rustdoc
 
 **Why?**
+
 - Generate docs from code comments
 - Inline examples
 - Search functionality
 
 **Command**:
+
 ```bash
 cargo doc --open
 ```
@@ -490,12 +533,14 @@ cargo doc --open
 ### 5.1 Deployment: VPS
 
 **Recommended Specs**:
+
 - **CPU**: 4 vCPU (for concurrent tasks)
 - **RAM**: 8GB (price cache + WebSocket buffers)
 - **Storage**: 20GB SSD
 - **Network**: 1Gbps (low latency)
 
 **Providers**:
+
 - **DigitalOcean**: $48/month (Droplet 8GB)
 - **Hetzner**: $40/month (CPX31)
 - **Vultr**: $48/month (High Frequency 8GB)
@@ -507,11 +552,13 @@ cargo doc --open
 ### 5.2 Monitoring (Optional)
 
 **Prometheus + Grafana**:
+
 ```toml
 prometheus = "0.13"
 ```
 
 **Metrics Exposed**:
+
 - Price update frequency
 - Cache hit/miss ratio
 - Opportunity detection rate
@@ -653,6 +700,7 @@ codegen-units = 1
 4. **Provide Context** through Rules and Workflows
 
 **Custom Rules** (Add to Antigravity):
+
 ```
 Rule: Rust Best Practices
 - Use Result<T, E> for error handling, never unwrap() in production
@@ -675,6 +723,7 @@ Rule: Performance Critical
 ```
 
 **Workflow Examples**:
+
 ```
 /test-websocket: Test WebSocket connection to Helius
 /benchmark-cache: Run cache performance benchmarks
@@ -685,6 +734,7 @@ Rule: Performance Critical
 ### 8.2 Agent Task Breakdown
 
 **Agent 1: WebSocket Infrastructure**
+
 ```
 Task: Implement WebSocket connection manager with reconnection logic
 Context: Helius Geyser plugin, handle accountSubscribe messages
@@ -696,6 +746,7 @@ Deliverables:
 ```
 
 **Agent 2: Data Decoders**
+
 ```
 Task: Build account data parsers for Raydium, Orca, Meteora
 Context: Borsh deserialization, DEX-specific layouts
@@ -707,6 +758,7 @@ Deliverables:
 ```
 
 **Agent 3: Price Calculator**
+
 ```
 Task: Implement AMM and CLMM price calculation with slippage
 Context: Constant product formula, concentrated liquidity math
@@ -717,6 +769,7 @@ Deliverables:
 ```
 
 **Agent 4: Opportunity Detector**
+
 ```
 Task: Build spatial and statistical arbitrage detectors
 Context: Multi-DEX comparison, Z-score calculations
@@ -733,11 +786,11 @@ Deliverables:
 ### 9.1 Performance Comparison
 
 | Language | Latency (ms) | Memory (MB) | Throughput (ops/s) |
-|----------|-------------|-------------|-------------------|
-| **Rust** | **76** | **50** | **15,000** |
-| Go | 120 | 80 | 12,000 |
-| Node.js | 180 | 150 | 8,000 |
-| Python | 450 | 200 | 2,000 |
+| -------- | ------------ | ----------- | ------------------ |
+| **Rust** | **76**       | **50**      | **15,000**         |
+| Go       | 120          | 80          | 12,000             |
+| Node.js  | 180          | 150         | 8,000              |
+| Python   | 450          | 200         | 2,000              |
 
 **Winner**: Rust by 1.5-6x
 
@@ -760,6 +813,7 @@ Deliverables:
 ## 10. CONCLUSION
 
 This technology stack is optimized for:
+
 - ⚡ **Ultra-low latency** (<400ms end-to-end)
 - 🔒 **Memory safety** (no crashes in production)
 - 🚀 **High throughput** (1000+ updates/second)

@@ -17,8 +17,12 @@ futures = "0.3"
 # WEBSOCKET & NETWORKING
 # ============================================
 tokio-tungstenite = { version = "0.21", features = ["native-tls"] }
+url = "2.5"
 tonic = "0.11"
 prost = "0.12"
+axum = { version = "0.7", features = ["ws"] }
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
 
 # ============================================
 # SOLANA SDK (2026 Stable)
@@ -61,6 +65,12 @@ statrs = "0.17"
 # DATE/TIME
 # ============================================
 chrono = { version = "0.4", features = ["serde"] }
+
+# ============================================
+# LOCK-FREE DATA STRUCTURES
+# ============================================
+dashmap = "5.5"
+toml = "0.8"
 
 [dev-dependencies]
 criterion = "0.5"

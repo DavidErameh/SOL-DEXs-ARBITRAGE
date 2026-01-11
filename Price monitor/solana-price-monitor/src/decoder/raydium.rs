@@ -51,6 +51,10 @@ impl PoolDecoder for RaydiumDecoder {
             token_b_decimals: amm_info.pc_decimals as u8,
             fee_rate: 0.0025, // Default Raydium fee 0.25%
             liquidity: 0, // Raydium V4 doesn't track liquidity in the same way as CLMM
+            specific_data: super::SpecificPoolData::Amm {
+                coin_vault_balance: amm_info.coin_vault_balance,
+                pc_vault_balance: amm_info.pc_vault_balance,
+            },
         })
     }
 

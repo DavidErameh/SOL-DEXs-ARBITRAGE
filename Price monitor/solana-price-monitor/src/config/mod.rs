@@ -55,16 +55,72 @@ impl Settings {
             .add_source(config::File::with_name("config").required(false))
             .add_source(config::Environment::with_prefix("APP").separator("__"));
 
-        let settings = builder
+        let config = builder
             .build()
-            .context("Failed to build configuration")?
-            .try_deserialize::<Settings>()
+            .context("Failed to build configuration")?;
+
+        let mut settings: Settings = config
+            .try_deserialize()
             .context("Failed to deserialize configuration")?;
+
+        // Resolve RPC URLs with priority: RPC_* > ALCHEMY_* > HELIUS_*
+        settings.rpc = Self::resolve_rpc_config(&settings.rpc)?;
 
         // Validate required fields
         settings.validate()?;
 
         Ok(settings)
+    }
+
+    /// Resolve RPC URLs from environment variables with fallback chain
+    fn resolve_rpc_config(current: &RpcConfig) -> Result<RpcConfig> {
+        // Priority 1: Direct RPC_* environment variables
+        if let (Ok(ws), Ok(http)) = (
+            std::env::var("RPC_WS_URL"),
+            std::env::var("RPC_HTTP_URL"),
+        ) {
+            if !ws.contains("${") && !http.contains("${") {
+                return Ok(RpcConfig {
+                    websocket_url: ws,
+                    http_url: http,
+                });
+            }
+        }
+
+        // Priority 2: Alchemy API key
+        if let Ok(api_key) = std::env::var("ALCHEMY_API_KEY") {
+            if !api_key.is_empty() && !api_key.contains("your-") {
+                return Ok(RpcConfig {
+                    websocket_url: format!("wss://solana-mainnet.g.alchemy.com/v2/{}", api_key),
+                    http_url: format!("https://solana-mainnet.g.alchemy.com/v2/{}", api_key),
+                });
+            }
+        }
+
+        // Priority 3: Helius API key (fallback)
+        if let Ok(api_key) = std::env::var("HELIUS_API_KEY") {
+            if !api_key.is_empty() && !api_key.contains("your-") {
+                let cluster = std::env::var("SOLANA_CLUSTER").unwrap_or_else(|_| "mainnet".to_string());
+                let (http_base, ws_base) = if cluster == "devnet" {
+                    ("https://devnet.helius-rpc.com", "wss://devnet.helius-rpc.com")
+                } else {
+                    ("https://mainnet.helius-rpc.com", "wss://mainnet.helius-rpc.com")
+                };
+
+                return Ok(RpcConfig {
+                    websocket_url: format!("{}?api-key={}", ws_base, api_key),
+                    http_url: format!("{}?api-key={}", http_base, api_key),
+                });
+            }
+        }
+
+        // Fallback: Use config file values if they don't contain placeholders
+        if !current.websocket_url.contains("${") && !current.http_url.contains("${") 
+            && !current.websocket_url.is_empty() && !current.http_url.is_empty() {
+            return Ok(current.clone());
+        }
+
+        anyhow::bail!("No valid RPC configuration found. Set ALCHEMY_API_KEY or HELIUS_API_KEY in .env")
     }
 
     fn validate(&self) -> Result<()> {

@@ -45,70 +45,92 @@ sudo apt install -y \
     git \
     htop \
     tmux
-
-# Install AWS CLI (for AWS deployment)
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip awscliv2.zip
-sudo ./aws/install
-rm -rf aws awscliv2.zip
-
-# Verify AWS CLI
-aws --version
 ```
 
-### 1.3 Helius API Setup
+### 1.1 Prerequisites (Oracle Cloud - Always Free)
 
-1. **Create Account**: Visit [https://dev.helius.xyz/](https://dev.helius.xyz/)
-2. **Generate API Key**: Dashboard → API Keys → Create New Key
-3. **Select Plan**:
+We use **Oracle Cloud Infrastructure (OCI)** because its "Always Free" tier provides an **Ampere A1** instance with **4 OCPUs and 24GB RAM**. This is vastly superior to AWS Free Tier (1 vCPU/1GB RAM) and allows for native Rust compilation without crashing.
 
-| Plan          | Rate Limit | WebSocket Connections | Cost       |
-| ------------- | ---------- | --------------------- | ---------- |
-| **Free**      | 100 req/s  | 10 concurrent         | $0/month   |
-| **Developer** | 500 req/s  | 25 concurrent         | $49/month  |
-| **Business**  | 2000 req/s | 100 concurrent        | $199/month |
+1.  **Oracle Cloud Account**: Sign up at [signup.cloud.oracle.com](https://signup.cloud.oracle.com/).
+2.  **SSH Key Pair**: Generate an ED25519 key pair locally:
+    ```bash
+    ssh-keygen -t ed25519 -f ~/.ssh/oracle_key
+    ```
 
-> [!TIP]
-> The **Free tier** is sufficient for monitoring up to 50 pools. Upgrade only if you need more concurrent connections or higher throughput.
+### 1.2 Instance Setup (The "Flawless" Method)
 
-### 1.4 Security Hardening
+1.  **Create Instance**:
 
-#### SSH Configuration
+    - **Name**: `solana-monitor-01`
+    - **Image**: **Ubuntu 24.04 Minimal** or **22.04** (Architecture: **Ampere/ARM64**).
+    - **Shape**: Select **Ampere** -> **VM.Standard.A1.Flex**.
+    - **Config**: Drag sliders to **4 OCPUs** and **24 GB RAM**.
+    - **Networking**: Create new VCN (Virtual Cloud Network). Ensure "Assign a public IPv4 address" is checked.
+    - **SSH Keys**: Upload the `oracle_key.pub` you generated.
+    - Click **Create**.
+
+2.  **Configure Network (The Critical Step)**:
+
+    - Go to **Networking** -> **Virtual Cloud Networks**.
+    - Click your VCN Name -> **Security Lists** -> **Default Security List**.
+    - **Add Ingress Rules**:
+      - **Rule 1 (SSH)**: Source: `0.0.0.0/0`, Protocol: TCP, Port: `22`
+      - **Rule 2 (Metrics)**: Source: `0.0.0.0/0`, Protocol: TCP, Port: `9090` (or restrict to your IP).
+
+3.  **Connect**:
+    ```bash
+    ssh -i ~/.ssh/oracle_key ubuntu@<YOUR_INSTANCE_IP>
+    ```
+
+### 1.3 Server Environment Setup (Automated)
+
+We have created an automated script to handle dependencies, firewall, and Rust installation.
+
+1.  **Clone & Run Setup**:
+
+    ```bash
+    git clone https://github.com/your-repo/solana-price-monitor.git
+    cd solana-price-monitor
+    chmod +x scripts/*.sh
+
+    # Installs Dependencies, Configures Firewall (Ports 22, 9090), and Installs Rust
+    ./scripts/setup_oci_env.sh
+    ```
+
+    _Follow the prompts and reload shell:_ `source $HOME/.cargo/env`
+
+2.  **Edit Configuration**:
+    ```bash
+    nano .env
+    ```
+    - Set `ALCHEMY_API_KEY` (or `RPC_HTTP_URL` / `RPC_WS_URL`).
+    - Set `RUST_LOG=info`.
+
+### 1.4 Application Deployment (Automated)
+
+1.  **Install & Start Service**:
+
+    ```bash
+    # Installs systemd service and enables it
+    ./scripts/install_service.sh
+
+    # Builds release binary and starts the monitor
+    ./scripts/deploy_update.sh
+    ```
+
+2.  **Verify Status**:
+    ```bash
+    sudo systemctl status solana-price-monitor
+    # View Logs
+    journalctl -u solana-price-monitor -f
+    ```
+
+#### Update Procedure
+
+To update the application later, simply pull the changes and run the deploy script:
 
 ```bash
-# Edit SSH config
-sudo nano /etc/ssh/sshd_config
-
-# Add/modify these lines:
-PermitRootLogin no
-PasswordAuthentication no
-PubkeyAuthentication yes
-Port 2222  # Change from default 22
-
-# Restart SSH
-sudo systemctl restart sshd
-```
-
-#### Firewall Setup
-
-```bash
-# Install UFW
-sudo apt install -y ufw
-
-# Default policies
-sudo ufw default deny incoming
-sudo ufw default allow outgoing
-
-# Allow SSH (use your custom port)
-sudo ufw allow 2222/tcp
-
-# Allow metrics (only if needed externally)
-# sudo ufw allow 9090/tcp  # Prometheus
-# sudo ufw allow 3000/tcp  # Grafana
-
-# Enable firewall
-sudo ufw enable
-sudo ufw status
+./scripts/deploy_update.sh
 ```
 
 #### Create Non-Root User
@@ -132,12 +154,13 @@ Create `/opt/solana-price-monitor/.env`:
 # PRODUCTION ENVIRONMENT
 # ============================================
 
-# Helius API (replace with your actual key)
-HELIUS_API_KEY=your-production-api-key
-HELIUS_WS_URL=wss://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}
-HELIUS_HTTP_URL=https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}
+# Zero-Cost Config (Alchemy)
+ALCHEMY_API_KEY=your-alchemy-key
 
-# Logging (production settings)
+# OR Helius Config
+# HELIUS_API_KEY=your-helius-key
+
+# Logging
 RUST_LOG=info,solana_price_monitor=info
 
 # Metrics
@@ -155,28 +178,17 @@ Create `/opt/solana-price-monitor/config.toml`:
 # PRODUCTION CONFIGURATION
 # ============================================
 
-[rpc]
-websocket_url = "${HELIUS_WS_URL}"
-http_url = "${HELIUS_HTTP_URL}"
+# [rpc] section is handled automatically by env vars now (RPC_* or ALCHEMY_*)
 
 [monitoring]
-max_pools = 50
+max_pools = 100
 cache_ttl_seconds = 60
 cleanup_interval_seconds = 10
 stale_threshold_ms = 2000
 
-[arbitrage]
-min_profit_percent = 0.5
-max_trade_size_percent = 5.0
-slot_tolerance = 2
+# ... [arbitrage] and [fees] sections same as above ...
 
-[fees]
-default_dex_fee = 0.25
-estimated_slippage = 0.3
-gas_cost_percent = 0.01
-jito_tip_percent = 0.05
-
-# Production pool addresses
+# Production pool addresses (21 Pools)
 [pools.sol_usdc]
 raydium = "58oQChx4yWmvKdwLLZzBi4ChoCc2fqCUWBkwMihLYQo2"
 orca = "HJPjoWUrhoZzkNfRpHuieeFk9WcZWjwy6PBjZ81ngndJ"
@@ -184,6 +196,15 @@ meteora = "7YttLkHDoNj9wyDur5pM1ejNaAvT9X4eqaYcHQqtj2G5"
 
 [pools.sol_usdt]
 raydium = "7XawhbbxtsRcQA8KTkHT9f9nc6d69UwqCDh6U5EEbEmX"
+orca = "4X1oYoFWF9U6R1pQ7v7iXw7g6C6C6C6C6C6C6C6C6C6" # Placeholder
+meteora = "3tD3...real...address"
+
+[pools.bonk_sol]
+raydium = "Hv4...address"
+orca = "..."
+meteora = "..."
+
+# (Config supports all 7 pairs × 3 DEXs)
 ```
 
 ### 1.6 Build Release Binary
